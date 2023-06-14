@@ -10,6 +10,12 @@ Likely a way to use components at calc time, but I'm already making too many err
 
 ## To-Do:
 
+- Provide Terminal Options / Deeper Shaping
+    - Hoop: Chamfer the ends so it can taper down from full depth, in case of allowing potentially small hooks to latch in.
+    - Hole: Alter shape and control over sizing. 
+    - Rod: Shape, extent, width/length/radius?
+    - T: Width?
+
 - Augment initial/constrained anchor point (Segment/2, Width/2-Thickness/2) to be offset, replaced with linear connection beyond, so as to allow "roundness" factor. Mesh can then be variously drawn as a zig-zag, with bevel, continuously up to the standard rounded mesh.
 
 - Variable terminal positioning, maybe via parameterized start/end offset - offset that causes termination on center or outer, or over draw and then intersect with hull of desired length, offset appropriately? Sort of extravagant.

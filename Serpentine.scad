@@ -18,11 +18,11 @@
     
 /* [Terminals] */
 // How far the terminals of the spring linearly extend beyond length (mm).
-    Extension = 4;
+    Extension = 6;
 // Center the terminals so they are centered.
     Centered = true;
 // Design to add to each end of the spring.
-    Design = "None"; // [None, Hole, Hoop, T, Rod]
+    Design = "Rod"; // [None, Hole, Hoop, T, Rod]
     
 /* [Hidden] */
     $fs = 0.01;
@@ -153,7 +153,6 @@ module Centering() {
 
     union() {
         // Arm to arc
-        color("Brown")
         translate([CenteringArmY,CenteringArmX,0])
         rotate([0,0,Angle])
         translate([0,0,Depth/2])
@@ -163,7 +162,6 @@ module Centering() {
         square([Thickness,Depth], center=true);
         
         // Arc to arm to arc
-        color("white")
         translate([CenteringAnchorY-CenteringRadius,-CenteringAnchorX,0])
         rotate_extrude(angle = 90 + Angle, $fn = 100) {
             translate([CenteringRadius-Thickness/2,0,0])
@@ -184,7 +182,6 @@ module Sector(Terminate = false) {
             ArmExtrusion = Terminate ? 1 : sqrt(ArmX^2 + ArmY^2) + 0.1;
             
             if(!Terminate) {
-                color("Pink")
                 translate([ArmY,ArmX,0])
                 rotate([0,0,Angle])
                 translate([0,0,Depth/2])
@@ -198,20 +195,8 @@ module Sector(Terminate = false) {
                 Centering();
             }
             
-            /* Old - extrudes away from origin
-                Probably better as we can more easily overlap it by .1
-            color("Pink")
-            rotate([0,0,Angle])
-            translate([0,-Thickness/2,0])
-            rotate([90,0,90])
-            linear_extrude(ArmExtrusion)
-            translate([ArmX,ArmY,0])
-            square([Thickness,Depth]);
-            */     
-            
             // Overlap extension
             if(!Terminate) {
-                color("purple")
                 rotate([0,0,Angle])
                 translate([0,-Thickness/2,0])
                 rotate([90,0,90])
@@ -219,27 +204,15 @@ module Sector(Terminate = false) {
             }
         }
 
-        color("skyblue")
         translate([AnchorY-Radius,-AnchorX,0])
         rotate_extrude(angle = 90 + Angle, $fn = 100) {
             translate([Radius-Thickness/2,0,0])
             square([Thickness,Depth]);
         }
-        
-        /* Just visually checking the centering extent 
-        if(Terminate) {
-            Extension = 1;
-            translate([-Thickness/2,Overlap/2,-Depth])
-            cube([Width,Extension,Depth]);
-        }
-        */
-        
-
     }
 }
 
-
-// Full wave, by mirroring.
+// Full wave composed of sectors/union tissue.
 module Wave(Start = false, End = false) {
     Connective = Thickness/5;
     
@@ -259,7 +232,6 @@ module Wave(Start = false, End = false) {
         Sector(Start);
         
         // Connective tissue for boolean between segments
-        color("black")
         translate([AnchorY+Thickness/2-Width, - AnchorX - Connective/2 + Segment,0])
         cube([Thickness,Connective,Depth]);
         
@@ -273,7 +245,6 @@ module Wave(Start = false, End = false) {
         
         // Connective tissue for following sections if not endpoint
         if(Centered || Endpoint != true) {
-            color("black")
             translate([AnchorY-Thickness/2, 3*AnchorX - Connective/2,0])
             cube([Thickness,Connective,Depth]);
         }
@@ -281,28 +252,66 @@ module Wave(Start = false, End = false) {
 }
 
 module Terminal() {
-    // Design = "None"; // [None, Hoop, Hole, T, Rod]
-        // Hole effectively RodZ, hole punch depend on ext size naturally
-    
-    // Subtract hole if desired.
-    difference() {
-        translate([-Thickness/2,0,0])
-        cube([Thickness,Extension,Depth]);
-        
-        if(Design == "Hole") {
+    // Design = "None"; // [None, Hole, Hoop, T, Rod]
+
+    // Hole
+    HoleDisp = Extension*0.6 > 4 ? 4 : Extension*0.6; 
+
+    // Hoop
+    HoopOuterRadius = Extension/2;
+    HoopInnerRadius = 3*HoopOuterRadius/4;
+
+    union() {
+
+        // Draw extension, subtract hole if desired.
+        difference() {
             translate([-Thickness/2,0,0])
             cube([Thickness,Extension,Depth]);
+            
+            if(Design == "Hole") {
+                translate([-Thickness,Extension - HoleDisp - HoleDisp/3, (Depth - 3*Depth/4)/2])
+                cube([Thickness*2,HoleDisp,3*Depth/4]);
+            }
+
+            if(Design == "Hoop") {
+                translate([0,3*Extension/4,-1/2])
+                cylinder(Depth+1, HoopInnerRadius, HoopInnerRadius);
+            }
         }
+        
+        // Desired Appendage
+
+        if(Design == "Hoop") {
+            difference() {
+                translate([0,3*Extension/4,0])
+                cylinder(Depth, HoopOuterRadius, HoopOuterRadius);
+
+                translate([0,3*Extension/4,-1/2])
+                cylinder(Depth+1, HoopInnerRadius, HoopInnerRadius);
+
+                // Chamfer end to an Allowable Overhang
+            }
+        }
+
+        if(Design == "T") {
+            //color("red")
+            translate([-Width/4,Extension-Thickness,0])
+            cube([Width/2, Thickness, Depth]);
+        }
+
+        if(Design == "Rod") {
+            RodRadius = Thickness;
+
+            translate([0,Extension-RodRadius/2,0])
+            cylinder(2*Depth, RodRadius, RodRadius);
+        }
+    
+        // Overlap 
+        translate([-Thickness/2,-0.1,0])
+        cube([Thickness,0.2,Depth]);
     }
     
-    // Desired Appendage
-    
-    // Overlap 
-    
 }
-
-Terminal();
-
 
 // Create the array and union of full spring at freq. and terminals.
 module Spring() {
@@ -312,18 +321,17 @@ module Spring() {
             translate([0,i*Wavelength,0])
             Wave(i == 0, i == Frequency-1);   
         }
-        
-        // Start
-        translate([0,-Extension,0])
-        cube([Thickness,Extension+0.2,Depth]);
-
-        // End 
-        translate([-Thickness/2,Length,0])
-        cube([Thickness,Extension+0.1,Depth]);
-        
-        Terminals();
     }
 }
 
-// Spring();
+union() {
+    Spring();
+
+    // Start
+    rotate([0,0,180])
+    Terminal(); 
+
+    translate([0,Length,0])
+    Terminal();
+}
 
