@@ -10,11 +10,13 @@
 // The breadth of the spring line (mm).
     Thickness = 2;
 // Height of the mesh (mm).
-    Depth = 5;
+    Depth = 4;
 // Inward tilt of rungs (deg).
-    Angle = 0; // [0 : 1 : 45]
-// Factor ranging beveled "zig-zag" to circular wave.
-    Roundness = 1; // [0: 0.05 : 1]
+    Angle = 15; // [0 : 1 : 45]
+// Factor continuously modifying shape from straight "zig-zag" to circular wave. 
+    Roundness = 0.75; // [0: 0.05 : 1]
+// Draw sharp angled caps when "Roundness" factor is zero?
+    Corner = false;
     
 /* [Terminals] */
 // How far the terminals of the spring linearly extend beyond length (mm).
@@ -25,49 +27,48 @@
     Design = "Hole"; // [None, Hole, Hoop, T, Rod]
     
 /* [Hidden] */
-    $fa = 36;
-    $fs = 2;
+    $fa = 12;
+    $fs = 1;
     Clearance = 0.3;
     Guides = false;
 
 
 // Computed Values
 
-    RoundnessNormalized = 0.9 * Roundness + 0.1;
-
     // Centering Compensation:
-    
+        // This should happen either as component wrangling or at least some kind of recursing function 
+        InitialSegment = Length/(2*Frequency);
         InitialAnchorY = Width/2 - Thickness/2;
-        InitialAnchorX  = (Length/(4*Frequency))*RoundnessNormalized;
-        
+
+        InitialAngleExtension = tan(Angle)*(Width/2 - Thickness) - (Thickness/2)/cos(Angle);
+		InitialAnchorX  = (InitialSegment/2)*Roundness - InitialAngleExtension*(1-Roundness);
+
         InitialRadius = (InitialAnchorX + tan(Angle)*InitialAnchorY)/ (cos(Angle) + tan(Angle) + tan(Angle)*sin(Angle));
-        
         InitialArcX = InitialRadius - cos(Angle) * InitialRadius;
         InitialArmX = tan(Angle) * (InitialAnchorY - InitialRadius - sin(Angle) * InitialRadius); 
         
         LengthAdjustment = 2*(InitialArmX + InitialArcX) + Thickness;
-    
 	    AdjustedLength = Centered ? Length - LengthAdjustment : Length;
     
     // Main Values:
-    
-		Wavelength = AdjustedLength/Frequency;
+        Straight = Corner && Roundness == 0;
+
+    	Wavelength = AdjustedLength/Frequency;
 		Segment = Wavelength/2;
 		Segments = Frequency*4;
-
 		AnchorY = Width/2 - Thickness/2;
-		AnchorX  = (Segment/2)*RoundnessNormalized;
-		
+        // Allow extending into "overhang"/angle region when flattening.
+        AngleExtension = tan(Angle)*(Width/2 - Thickness) - (Thickness/2)/cos(Angle);
+		AnchorX  = (Segment/2)*Roundness - AngleExtension*(1-Roundness);
+
 		Radius = (AnchorX + tan(Angle)*AnchorY)/ (cos(Angle) + tan(Angle) + tan(Angle)*sin(Angle));
 		   
 		ArcX = Radius - cos(Angle) * Radius;
 		ArcY = sin(Angle) * Radius;
 		ArmY = AnchorY - Radius - sin(Angle) * Radius;   
 		ArmX = tan(Angle) * ArmY; 
-       
-       
-    // Useful Guide Values:
 
+    // Useful Guide Values:
 		Overlap = 2*(ArmX + ArcX) + Thickness;
 		RealDiameter = 2*Radius+Thickness;
 		Offset = RealDiameter - Overlap;
@@ -77,9 +78,8 @@
 // Assertions/Tests:
 
     // Plus thickness? Not sure.
-    RequiredWidth = Radius+ArcY;
+    RequiredWidth = Radius + ArcY;
     assert(AnchorY > RequiredWidth, "Not enough space to draw segments, increase width or reduce angle.");        
-       
        
 // Dimensions/segmentation guide for visual checks.    
 module Guide() {
@@ -128,7 +128,6 @@ module Guide() {
         }
     }
 }
-
     
 if(Guides) {
     color("orange")
@@ -138,91 +137,109 @@ if(Guides) {
     Guide();
 }
 
-
-// Centering shape for terminating center loops
+// For terminating spring with sector stopping centered
 module Centering() {
-    
     CenteringAnchorY = ArmY;
     CenteringAnchorX  = Overlap/2 - ArmX;
-    
     CenteringRadius = (CenteringAnchorX + tan(Angle)*CenteringAnchorY)/ (cos(Angle) + tan(Angle) + tan(Angle)*sin(Angle));
-       
     CenteringArcX = CenteringRadius - cos(Angle) * Radius;
     CenteringArcY = sin(Angle) * CenteringRadius;
     CenteringArmY = CenteringAnchorY - CenteringRadius - sin(Angle) * CenteringRadius;   
     CenteringArmX = tan(Angle) * CenteringArmY;
-   
     CenteringArmExtrusion = sqrt(CenteringArmX^2 + CenteringArmY^2) + 0.1;
 
     union() {
-        // Arm to arc
-        translate([CenteringArmY,CenteringArmX,0])
-        rotate([0,0,Angle])
-        translate([0,0,Depth/2])
-        rotate([90,0,90])
-        mirror([0,0,1])
-        linear_extrude(CenteringArmExtrusion)
-        square([Thickness,Depth], center=true);
-        
-        // Arc to arm to arc
-        translate([CenteringAnchorY-CenteringRadius,-CenteringAnchorX,0])
-        rotate_extrude(angle = 90 + Angle, $fn = 100) {
-            translate([CenteringRadius-Thickness/2,0])
-            square([Thickness,Depth]);
+        X1 = CenteringArmX + 0.01; //sqrt(ArmY^2 + ArmX^2);
+        Y1 = Thickness/2; 
+        X2 = -CenteringArmY - 0.01 - (Straight ? Thickness : 0);
+        Y2 = -Thickness/2;
+
+        firstPoints = [
+            [X1 + (Straight ? (Thickness)*tan(Angle) + 0.01 : 0 ), Y1], 
+            [X1 + (Straight ? 0.01 : 0), Y2], 
+            [X2, Y2],
+            [X2, Y1]
+        ];
+        firstPaths = [[0, 1, 2, 3]];
+
+        rotate([0,0,180+Angle])
+        linear_extrude(Depth) 
+        polygon(firstPoints, firstPaths);
+
+        // Arc 
+        if(!Straight) {
+            translate([CenteringAnchorY-CenteringRadius,-CenteringAnchorX,0])
+            rotate_extrude(angle = 90 + Angle, $fn = 100) {
+                translate([CenteringRadius-Thickness/2,0])
+                square([Thickness,Depth]);
+            }
         }
-        
     }
-    
 }
 
 // Half of spring segment/"rung", to be transformed and arrayed.
 module Sector(Terminate = false) {
-    // Arm and Overlap and Hoop and Overlap
+
     union() {
-        // Arm and Overlap
-        union() {
-            // Initial arm
-            ArmExtrusion = Terminate ? 1 : sqrt(ArmX^2 + ArmY^2) + 0.1;
-            
-            if(!Terminate) {
-                translate([ArmY,ArmX,0])
-                rotate([0,0,Angle])
-                translate([0,0,Depth/2])
-                rotate([90,0,90])
-                mirror([0,0,1])
-                linear_extrude(ArmExtrusion)
-                square([Thickness,Depth], center=true);
-            } else {
-                translate([ArmY,ArmX,0])
-                rotate([0,0,180])
-                Centering();
-            }
-            
-            // Overlap extension
-            if(!Terminate) {
-                rotate([0,0,Angle])
-                translate([-0.1,-Thickness/2,0])
-                cube([0.2,Thickness,Depth]);
-            }
+        // First Arm (Arm connecting central axis.)
+        if(Centered && Terminate) {
+            translate([ArmY,ArmX,0])
+            rotate([0,0,180])
+            Centering();
+        } else {
+            X1 = sqrt(ArmY^2 + ArmX^2);
+            Y1 = Thickness/2; 
+            X2 = 0;
+            Y2 = -Thickness/2;
+
+            firstPoints = [
+                [X1 + (Straight ? (Thickness)*tan(Angle) + 0.01 : 0 ), Y1], 
+                [X1 + (Straight ? 0.01 : 0), Y2], 
+                [X2, Y2],
+                [X2, Y1]
+            ];
+            firstPaths = [[0, 1, 2, 3]];
+
+            rotate([0,0,Angle])
+            linear_extrude(Depth) 
+            polygon(firstPoints, firstPaths);
         }
 
-        translate([AnchorY-Radius,-AnchorX,0])
-        rotate_extrude(angle = 90 + Angle, $fn = 100) {
-            translate([Radius-Thickness/2,0])
-            square([Thickness,Depth]);
-        }
-
-        // Linear arm for non-roundness 
+        // Second Arm (Arm to other sector, if non-full roundness.)
         if(Roundness != 1) {
-            NonRoundArm = Segment/2 - AnchorX;
+            X1 = AnchorY - Thickness/2;
+            Y1 = -AnchorX + (Straight ? Thickness/cos(Angle) : 0);
+            X2 = AnchorY + Thickness/2;
 
-            translate([AnchorY,-AnchorX,0])
-            translate([0,0,Depth/2])
-            rotate([90,0,0])
-            linear_extrude(NonRoundArm+0.01)
-            square([Thickness,Depth], center=true);
+            points = [
+                [X1, -Segment/2], 
+                [X1, Y1], 
+                [X2, Y1], 
+                [X2, -Segment/2]
+            ];
+            paths = [[0, 1, 2, 3]];
+
+            linear_extrude(Depth) 
+            polygon(points, paths);
         }
-        
+
+        // Rounding
+        if(!Straight) {
+            translate([AnchorY-Radius,-AnchorX,0])
+            rotate_extrude(angle = 90 + Angle, $fn = 100) {
+                translate([Radius-Thickness/2,0])
+                square([Thickness,Depth]);
+            }
+        } else {
+            // Insert chunk?
+        }
+
+        // Overlap Extension
+        if(!Terminate) {
+            rotate([0,0,Angle])
+            translate([-0.1,-Thickness/2,0])
+            cube([0.2,Thickness,Depth]);
+        }
     }
 }
 
@@ -245,7 +262,7 @@ module Wave(Start = false, End = false) {
         }
         
         rotate([0,0,180])
-        Sector(Start);
+        Sector(Centered && Start);
         
         // Connective tissue for boolean between segments
         translate([AnchorY+Thickness/2-Width, - AnchorX - Connective/2 + Segment,0])
@@ -260,6 +277,8 @@ module Wave(Start = false, End = false) {
         Sector();
         
         // Connective tissue for following sections if not endpoint
+        Endpoint = Start && End;
+        
         if(Roundness == 1 && (Centered || Endpoint != true)) {
             translate([AnchorY-Thickness/2, 3*AnchorX - Connective/2,0])
             cube([Thickness,Connective,Depth]);
@@ -339,14 +358,22 @@ module Spring() {
     }
 }
 
-union() {
-    Spring();
+module Draw() {
+    union() {
+        Spring();
 
-    // Start
-    rotate([0,0,180])
-    Terminal(); 
+        TerminalOffset = Centered ? 0 : Width/2 - Thickness/2;
+        // Start
+        translate([TerminalOffset,0, 0])
+        rotate([0,0,180])
+        Terminal(); 
 
-    translate([0,Length,0])
-    Terminal();
+        translate([TerminalOffset,Length,0])
+        Terminal();
+    }
 }
+
+Draw();
+
+
 

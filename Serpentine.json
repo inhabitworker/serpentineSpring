@@ -1,0 +1,73 @@
+{
+    "parameterSets": {
+        "StraightFlat": {
+            "$fa": "12",
+            "$fs": "1",
+            "Angle": "0",
+            "Centered": "true",
+            "Clearance": "0.3",
+            "Corner": "false",
+            "Depth": "5",
+            "Design": "Hole",
+            "Extension": "6",
+            "Frequency": "4",
+            "Guides": "false",
+            "Length": "50",
+            "Roundness": "0",
+            "Thickness": "2",
+            "Width": "12"
+        },
+        "StraightAlmost": {
+            "$fa": "12",
+            "$fs": "1",
+            "Angle": "0",
+            "Centered": "true",
+            "Clearance": "0.3",
+            "Corner": "false",
+            "Depth": "5",
+            "Design": "Hole",
+            "Extension": "6",
+            "Frequency": "4",
+            "Guides": "false",
+            "Length": "50",
+            "Roundness": "0.95",
+            "Thickness": "2",
+            "Width": "12"
+        },
+        "AngledAlmost": {
+            "$fa": "12",
+            "$fs": "1",
+            "Angle": "21",
+            "Centered": "true",
+            "Clearance": "0.3",
+            "Corner": "false",
+            "Depth": "5",
+            "Design": "Hole",
+            "Extension": "6",
+            "Frequency": "4",
+            "Guides": "false",
+            "Length": "50",
+            "Roundness": "0.95",
+            "Thickness": "2",
+            "Width": "12"
+        },
+        "AngledFlat": {
+            "$fa": "12",
+            "$fs": "1",
+            "Angle": "21",
+            "Centered": "true",
+            "Clearance": "0.3",
+            "Corner": "false",
+            "Depth": "5",
+            "Design": "Hole",
+            "Extension": "6",
+            "Frequency": "4",
+            "Guides": "false",
+            "Length": "50",
+            "Roundness": "0",
+            "Thickness": "2",
+            "Width": "12"
+        }
+    },
+    "fileFormatVersion": "1"
+}
