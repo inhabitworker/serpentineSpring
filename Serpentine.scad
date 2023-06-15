@@ -2,19 +2,19 @@
 
 /* [Dimension] */
 // Desired number of waves (each side).
-    Frequency = 5;
+    Frequency = 4;
 // Full length of the mesh. (mm)
-    Length = 80;
+    Length = 50;
 // Width of the mesh (mm).
-    Width = 20;
+    Width = 12;
 // The breadth of the spring line (mm).
     Thickness = 2;
 // Height of the mesh (mm).
     Depth = 5;
 // Inward tilt of rungs (deg).
-    Angle = 15; // [0 : 1 : 45]
-// Roundess from straight "zig-zag" to round hoops.
-    // Roundness = 0.5; // [0: 0.01 : 1]
+    Angle = 0; // [0 : 1 : 45]
+// Factor ranging beveled "zig-zag" to circular wave.
+    Roundness = 1; // [0: 0.05 : 1]
     
 /* [Terminals] */
 // How far the terminals of the spring linearly extend beyond length (mm).
@@ -22,20 +22,23 @@
 // Center the terminals so they are centered.
     Centered = true;
 // Design to add to each end of the spring.
-    Design = "Rod"; // [None, Hole, Hoop, T, Rod]
+    Design = "Hole"; // [None, Hole, Hoop, T, Rod]
     
 /* [Hidden] */
-    $fs = 0.01;
+    $fa = 36;
+    $fs = 2;
     Clearance = 0.3;
     Guides = false;
 
 
 // Computed Values
 
+    RoundnessNormalized = 0.9 * Roundness + 0.1;
+
     // Centering Compensation:
     
         InitialAnchorY = Width/2 - Thickness/2;
-        InitialAnchorX  = Length/(4*Frequency);
+        InitialAnchorX  = (Length/(4*Frequency))*RoundnessNormalized;
         
         InitialRadius = (InitialAnchorX + tan(Angle)*InitialAnchorY)/ (cos(Angle) + tan(Angle) + tan(Angle)*sin(Angle));
         
@@ -53,7 +56,7 @@
 		Segments = Frequency*4;
 
 		AnchorY = Width/2 - Thickness/2;
-		AnchorX  = Segment/2;
+		AnchorX  = (Segment/2)*RoundnessNormalized;
 		
 		Radius = (AnchorX + tan(Angle)*AnchorY)/ (cos(Angle) + tan(Angle) + tan(Angle)*sin(Angle));
 		   
@@ -164,7 +167,7 @@ module Centering() {
         // Arc to arm to arc
         translate([CenteringAnchorY-CenteringRadius,-CenteringAnchorX,0])
         rotate_extrude(angle = 90 + Angle, $fn = 100) {
-            translate([CenteringRadius-Thickness/2,0,0])
+            translate([CenteringRadius-Thickness/2,0])
             square([Thickness,Depth]);
         }
         
@@ -198,19 +201,32 @@ module Sector(Terminate = false) {
             // Overlap extension
             if(!Terminate) {
                 rotate([0,0,Angle])
-                translate([0,-Thickness/2,0])
-                rotate([90,0,90])
-                square([Thickness,Depth]);
+                translate([-0.1,-Thickness/2,0])
+                cube([0.2,Thickness,Depth]);
             }
         }
 
         translate([AnchorY-Radius,-AnchorX,0])
         rotate_extrude(angle = 90 + Angle, $fn = 100) {
-            translate([Radius-Thickness/2,0,0])
+            translate([Radius-Thickness/2,0])
             square([Thickness,Depth]);
         }
+
+        // Linear arm for non-roundness 
+        if(Roundness != 1) {
+            NonRoundArm = Segment/2 - AnchorX;
+
+            translate([AnchorY,-AnchorX,0])
+            translate([0,0,Depth/2])
+            rotate([90,0,0])
+            linear_extrude(NonRoundArm+0.01)
+            square([Thickness,Depth], center=true);
+        }
+        
     }
 }
+
+// Sector();
 
 // Full wave composed of sectors/union tissue.
 module Wave(Start = false, End = false) {
@@ -244,7 +260,7 @@ module Wave(Start = false, End = false) {
         Sector();
         
         // Connective tissue for following sections if not endpoint
-        if(Centered || Endpoint != true) {
+        if(Roundness == 1 && (Centered || Endpoint != true)) {
             translate([AnchorY-Thickness/2, 3*AnchorX - Connective/2,0])
             cube([Thickness,Connective,Depth]);
         }
@@ -294,7 +310,6 @@ module Terminal() {
         }
 
         if(Design == "T") {
-            //color("red")
             translate([-Width/4,Extension-Thickness,0])
             cube([Width/2, Thickness, Depth]);
         }
