@@ -8,7 +8,7 @@
 // Width of the mesh (mm).
     Width = 12;
 // The breadth of the spring line (mm).
-    Thickness = 2;
+    Thickness = 2; // [0.5 : 0.01 : 100]
 // Height of the mesh (mm).
     Depth = 4;
 // Inward tilt of rungs (deg).
